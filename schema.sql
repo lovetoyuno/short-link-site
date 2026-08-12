@@ -1,5 +1,3 @@
--- Short link site schema (Cloudflare D1 / SQLite)
-
 CREATE TABLE IF NOT EXISTS links (
   id TEXT PRIMARY KEY,
   code TEXT UNIQUE NOT NULL,
