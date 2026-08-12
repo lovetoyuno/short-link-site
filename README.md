@@ -40,6 +40,10 @@
 3. 进入刚创建的数据库，切换到 **Console**（控制台/查询）标签页。
 4. 打开项目中的 `schema.sql` 文件，全选复制其中内容，粘贴到 Console 的输入框中，点击执行（Execute / Run），建好 `links`、`clicks`、`domains` 三张表。
 
+   > ⚠️ **如果提示 “Requests without any query are not supported”**：说明粘贴时换行被压成了一行（或浏览器/输入框没保留换行），导致整段 SQL 只剩一行。解决方法：
+   > 1. 先尝试重新粘贴一次（目前的 `schema.sql` 已经删去了开头的 `--` 注释行，避免它把后面内容一并注释掉）；
+   > 2. 若仍失败，可以把三个 `CREATE TABLE ...` 语句（以分号 `;` 为分割）拆开，**一次只粘贴并执行一个语句**，依次建完 `links`、`clicks`、`domains` 三张表和对应的 `CREATE INDEX` 语句（共 6 次）。
+
 ### 第 3 步：在 Cloudflare 创建 Pages 项目并连接 GitHub（控制台操作）
 
 1. 左侧菜单 **Workers & Pages → Overview**，点击 **Create**。
@@ -100,7 +104,7 @@ short-link-site/
    └─ app.js               # 前端交互逻辑（调用 /api/*）
 ```
 
-> 本项目使用 Cloudflare Pages + Pages Functions，所以不需要 `wrangler.toml`，所有绑定（D1、环境变量）都在网页控制台的 Settings 里配置。
+> 本项目使用 Cloudflare Pages + Pages Functions，所以不需要 `wrangler.toml`，所有��定（D1、环境变量）都在网页控制台的 Settings 里配置。
 
 ## 已知限制 / 后续可扩展
 

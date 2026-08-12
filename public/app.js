@@ -1,8 +1,35 @@
 (function () {
   let baseUrl = ""
   let currentLinks = []
+  let editingId = null
 
   const el = (id) => document.getElementById(id)
+
+  // ---- Theme ----
+  function initTheme() {
+    const savedTheme = localStorage.getItem("sl-theme") || "light"
+    const savedAccent = localStorage.getItem("sl-accent") || "blue"
+    document.documentElement.setAttribute("data-theme", savedTheme)
+    document.documentElement.setAttribute("data-accent", savedAccent)
+    document.querySelectorAll(".accent-swatch").forEach((sw) => {
+      sw.classList.toggle("active", sw.dataset.accent === savedAccent)
+    })
+  }
+
+  function toggleTheme() {
+    const current = document.documentElement.getAttribute("data-theme") || "light"
+    const next = current === "dark" ? "light" : "dark"
+    document.documentElement.setAttribute("data-theme", next)
+    localStorage.setItem("sl-theme", next)
+  }
+
+  function setAccent(accent) {
+    document.documentElement.setAttribute("data-accent", accent)
+    localStorage.setItem("sl-accent", accent)
+    document.querySelectorAll(".accent-swatch").forEach((sw) => {
+      sw.classList.toggle("active", sw.dataset.accent === accent)
+    })
+  }
 
   function showToast(message) {
     const t = el("toast")
@@ -14,7 +41,7 @@
 
   function openModal(modalId) {
     el("modal-overlay").hidden = false
-    ;["modal-create", "modal-batch", "modal-domains", "modal-qr"].forEach((id) => {
+    ;["modal-create", "modal-edit", "modal-batch", "modal-domains", "modal-qr"].forEach((id) => {
       el(id).hidden = id !== modalId
     })
   }
@@ -218,15 +245,7 @@
       el("qr-url").textContent = data.encodedUrl
       openModal("modal-qr")
     } else if (action === "edit") {
-      const newTarget = prompt("修改目标地址（本月修改次数有上限）：", link.targetUrl)
-      if (newTarget === null || newTarget.trim() === link.targetUrl) return
-      try {
-        await api("/links/" + id, { method: "PATCH", body: { targetUrl: newTarget.trim() } })
-        showToast("已更新")
-        await refreshAll()
-      } catch (e) {
-        showToast(e.message)
-      }
+      openEditModal(link)
     } else if (action === "archive") {
       try {
         await api("/links/" + id, { method: "PATCH", body: { isArchived: !link.isArchived } })
@@ -247,6 +266,64 @@
     }
   }
 
+  // ---- Edit link (all fields) ----
+  function toLocalInput(iso) {
+    if (!iso) return ""
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return ""
+    const pad = (n) => String(n).padStart(2, "0")
+    return (
+      d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) +
+      "T" + pad(d.getHours()) + ":" + pad(d.getMinutes())
+    )
+  }
+
+  function openEditModal(link) {
+    editingId = link.id
+    el("e-target").value = link.targetUrl || ""
+    el("e-title").value = link.title || ""
+    el("e-code").value = link.code || ""
+    el("e-password").value = ""
+    el("e-password").placeholder = link.hasPassword ? "留空则保持原密码不变" : "留空则不设密码"
+    el("e-remove-password").checked = false
+    el("e-starts").value = toLocalInput(link.startsAt)
+    el("e-expires").value = toLocalInput(link.expiresAt)
+    el("edit-error").textContent = ""
+    openModal("modal-edit")
+  }
+
+  async function submitEdit() {
+    if (!editingId) return
+    const link = currentLinks.find((l) => l.id === editingId)
+    const targetUrl = el("e-target").value.trim()
+    const title = el("e-title").value.trim()
+    const code = el("e-code").value.trim()
+    const passwordInput = el("e-password").value
+    const removePassword = el("e-remove-password").checked
+    const startsAt = el("e-starts").value ? new Date(el("e-starts").value).toISOString() : null
+    const expiresAt = el("e-expires").value ? new Date(el("e-expires").value).toISOString() : null
+    el("edit-error").textContent = ""
+    if (!targetUrl) {
+      el("edit-error").textContent = "目标地址不能为空"
+      return
+    }
+    const body = { targetUrl, title, code, startsAt, expiresAt }
+    if (removePassword) {
+      body.password = ""
+    } else if (passwordInput) {
+      body.password = passwordInput
+    }
+    try {
+      await api("/links/" + editingId, { method: "PATCH", body })
+      closeModal()
+      editingId = null
+      showToast("已保存修改")
+      await refreshAll()
+    } catch (e) {
+      el("edit-error").textContent = e.message
+    }
+  }
+
   async function handleDomainAction(action, id) {
     if (action === "verify-domain") {
       await api("/domains/" + id, { method: "PATCH", body: { status: "active" } })
@@ -262,6 +339,12 @@
     el("btn-create").addEventListener("click", () => { resetCreateForm(); openModal("modal-create") })
     el("btn-create-empty").addEventListener("click", () => { resetCreateForm(); openModal("modal-create") })
     el("btn-submit-create").addEventListener("click", submitCreate)
+    el("btn-submit-edit").addEventListener("click", submitEdit)
+
+    el("theme-switch").addEventListener("click", toggleTheme)
+    document.querySelectorAll(".accent-swatch").forEach((sw) => {
+      sw.addEventListener("click", () => setAccent(sw.dataset.accent))
+    })
 
     el("btn-batch").addEventListener("click", () => {
       el("f-batch").value = ""
@@ -314,6 +397,7 @@
   }
 
   async function init() {
+    initTheme()
     bindEvents()
     await loadConfig()
     await refreshAll()

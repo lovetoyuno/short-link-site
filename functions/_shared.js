@@ -300,6 +300,15 @@ async function apiUpdateLink(request, env, id) {
 		updates.push("title = ?")
 		values.push(body.title || null)
 	}
+	if (typeof body.code === "string" && body.code.trim() !== link.code) {
+		const newCode = body.code.trim()
+		if (!isValidCode(newCode)) return errorJson("短码需为 3-32 位字母、数字、- 或 _")
+		const existing = await env.DB.prepare("SELECT id FROM links WHERE code = ? AND id != ?").bind(newCode, id).first()
+		if (existing) return errorJson("该短码已被占用,请更换一个")
+		updates.push("code = ?")
+		values.push(newCode)
+		updates.push("is_custom_code = 1")
+	}
 	if (body.password !== undefined) {
 		if (body.password) {
 			const { hash, salt } = await hashPassword(String(body.password))
