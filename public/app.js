@@ -6,21 +6,29 @@
   const el = (id) => document.getElementById(id)
 
   // ---- Theme ----
+  const THEME_MODES = ["light", "dark", "midnight", "sepia", "forest"]
+
   function initTheme() {
-    const savedTheme = localStorage.getItem("sl-theme") || "light"
+    let savedTheme = localStorage.getItem("sl-theme") || "light"
+    if (THEME_MODES.indexOf(savedTheme) === -1) savedTheme = "light"
     const savedAccent = localStorage.getItem("sl-accent") || "blue"
     document.documentElement.setAttribute("data-theme", savedTheme)
     document.documentElement.setAttribute("data-accent", savedAccent)
     document.querySelectorAll(".accent-swatch").forEach((sw) => {
       sw.classList.toggle("active", sw.dataset.accent === savedAccent)
     })
+    document.querySelectorAll(".mode-btn").forEach((b) => {
+      b.classList.toggle("active", b.dataset.mode === savedTheme)
+    })
   }
 
-  function toggleTheme() {
-    const current = document.documentElement.getAttribute("data-theme") || "light"
-    const next = current === "dark" ? "light" : "dark"
-    document.documentElement.setAttribute("data-theme", next)
-    localStorage.setItem("sl-theme", next)
+  function setMode(mode) {
+    if (THEME_MODES.indexOf(mode) === -1) mode = "light"
+    document.documentElement.setAttribute("data-theme", mode)
+    localStorage.setItem("sl-theme", mode)
+    document.querySelectorAll(".mode-btn").forEach((b) => {
+      b.classList.toggle("active", b.dataset.mode === mode)
+    })
   }
 
   function setAccent(accent) {
@@ -29,6 +37,269 @@
     document.querySelectorAll(".accent-swatch").forEach((sw) => {
       sw.classList.toggle("active", sw.dataset.accent === accent)
     })
+  }
+
+  // ---- Effects (particles + toggles) ----
+  const FX_DEFAULTS = {
+    particles: true,
+    blobs: true,
+    glow: true,
+    cards: true,
+    cursor: true,
+    tilt: true,
+    ripple: true,
+    counter: true,
+    beam: true,
+    grid: true,
+    rainbow: true,
+  }
+  const fxState = {}
+  const pointer = { x: null, y: null, active: false }
+  let particleAnim = { raf: null, ctx: null, canvas: null, points: [], running: false, resizeBound: false }
+
+  function fxAccentColor() {
+    const c = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()
+    return c || "#2783DE"
+  }
+
+  function hexToRgb(hex) {
+    const m = hex.replace("#", "")
+    const bigint = parseInt(m.length === 3 ? m.split("").map((c) => c + c).join("") : m, 16)
+    return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 }
+  }
+
+  function setupParticleCanvas() {
+    const canvas = el("fx-particles")
+    if (!canvas) return
+    particleAnim.canvas = canvas
+    particleAnim.ctx = canvas.getContext("2d")
+    resizeParticleCanvas()
+    const count = Math.max(30, Math.min(70, Math.round((window.innerWidth * window.innerHeight) / 22000)))
+    particleAnim.points = Array.from({ length: count }, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 0.35,
+      vy: (Math.random() - 0.5) * 0.35,
+    }))
+    if (!particleAnim.resizeBound) {
+      window.addEventListener("resize", debounce(resizeParticleCanvas, 200))
+      particleAnim.resizeBound = true
+    }
+  }
+
+  function resizeParticleCanvas() {
+    const canvas = particleAnim.canvas
+    if (!canvas) return
+    canvas.width = window.innerWidth * window.devicePixelRatio
+    canvas.height = window.innerHeight * window.devicePixelRatio
+    canvas.style.width = window.innerWidth + "px"
+    canvas.style.height = window.innerHeight + "px"
+  }
+
+  function stepParticles() {
+    const { ctx, canvas, points } = particleAnim
+    if (!ctx || !canvas) return
+    const dpr = window.devicePixelRatio || 1
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    const rgb = hexToRgb(fxAccentColor())
+    const linkDist = 130 * dpr
+    for (const p of points) {
+      p.x += p.vx * dpr
+      p.y += p.vy * dpr
+      if (p.x < 0 || p.x > canvas.width) p.vx *= -1
+      if (p.y < 0 || p.y > canvas.height) p.vy *= -1
+      p.x = Math.max(0, Math.min(canvas.width, p.x))
+      p.y = Math.max(0, Math.min(canvas.height, p.y))
+    }
+    for (let i = 0; i < points.length; i++) {
+      for (let j = i + 1; j < points.length; j++) {
+        const a = points[i]
+        const b = points[j]
+        const dx = a.x - b.x
+        const dy = a.y - b.y
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        if (dist < linkDist) {
+          const opacity = (1 - dist / linkDist) * 0.35
+          ctx.strokeStyle = "rgba(" + rgb.r + "," + rgb.g + "," + rgb.b + "," + opacity.toFixed(3) + ")"
+          ctx.lineWidth = 1 * dpr
+          ctx.beginPath()
+          ctx.moveTo(a.x, a.y)
+          ctx.lineTo(b.x, b.y)
+          ctx.stroke()
+        }
+      }
+    }
+    if (pointer.active && pointer.x !== null) {
+      const px = pointer.x * dpr
+      const py = pointer.y * dpr
+      const mouseDist = 180 * dpr
+      for (const p of points) {
+        const dx = p.x - px
+        const dy = p.y - py
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        if (dist < mouseDist) {
+          const opacity = (1 - dist / mouseDist) * 0.6
+          ctx.strokeStyle = "rgba(" + rgb.r + "," + rgb.g + "," + rgb.b + "," + opacity.toFixed(3) + ")"
+          ctx.lineWidth = 1.2 * dpr
+          ctx.beginPath()
+          ctx.moveTo(p.x, p.y)
+          ctx.lineTo(px, py)
+          ctx.stroke()
+          p.x -= (dx / (dist || 1)) * 0.25 * dpr
+          p.y -= (dy / (dist || 1)) * 0.25 * dpr
+        }
+      }
+    }
+    ctx.fillStyle = "rgba(" + rgb.r + "," + rgb.g + "," + rgb.b + ",0.55)"
+    for (const p of points) {
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, 1.8 * dpr, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    particleAnim.raf = requestAnimationFrame(stepParticles)
+  }
+
+  function startParticles() {
+    if (particleAnim.running) return
+    if (!particleAnim.canvas) setupParticleCanvas()
+    particleAnim.running = true
+    particleAnim.raf = requestAnimationFrame(stepParticles)
+  }
+
+  function stopParticles() {
+    particleAnim.running = false
+    if (particleAnim.raf) cancelAnimationFrame(particleAnim.raf)
+    particleAnim.raf = null
+    if (particleAnim.ctx && particleAnim.canvas) {
+      particleAnim.ctx.clearRect(0, 0, particleAnim.canvas.width, particleAnim.canvas.height)
+    }
+  }
+
+  function applyFxState() {
+    Object.keys(FX_DEFAULTS).forEach((key) => {
+      document.documentElement.setAttribute("data-fx-" + key, fxState[key] ? "on" : "off")
+      const btn = el("fx-" + key + "-switch")
+      if (btn) btn.classList.toggle("on", !!fxState[key])
+    })
+    if (fxState.particles && !document.hidden) startParticles()
+    else stopParticles()
+  }
+
+  function initFx() {
+    Object.keys(FX_DEFAULTS).forEach((key) => {
+      const saved = localStorage.getItem("sl-fx-" + key)
+      fxState[key] = saved === null ? FX_DEFAULTS[key] : saved === "1"
+    })
+    applyFxState()
+    initPointerFx()
+    initTilt()
+    initRipple()
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) stopParticles()
+      else if (fxState.particles) startParticles()
+    })
+  }
+
+  function toggleFx(key) {
+    fxState[key] = !fxState[key]
+    localStorage.setItem("sl-fx-" + key, fxState[key] ? "1" : "0")
+    applyFxState()
+  }
+
+  function resetFx() {
+    Object.keys(FX_DEFAULTS).forEach((key) => {
+      fxState[key] = FX_DEFAULTS[key]
+      localStorage.setItem("sl-fx-" + key, FX_DEFAULTS[key] ? "1" : "0")
+    })
+    applyFxState()
+    showToast("\u5df2\u6062\u590d\u9ed8\u8ba4\u7279\u6548")
+  }
+
+  // 鼠标光晕 + 粒子跟随
+  function initPointerFx() {
+    const glow = el("cursor-glow")
+    let raf = null
+    window.addEventListener("mousemove", (e) => {
+      pointer.x = e.clientX
+      pointer.y = e.clientY
+      pointer.active = true
+      if (glow && fxState.cursor) {
+        if (raf) cancelAnimationFrame(raf)
+        raf = requestAnimationFrame(() => {
+          glow.style.transform = "translate(" + e.clientX + "px," + e.clientY + "px)"
+          glow.classList.add("visible")
+        })
+      }
+    })
+    window.addEventListener("mouseleave", () => {
+      pointer.active = false
+      if (glow) glow.classList.remove("visible")
+    })
+  }
+
+  // 卡片 3D 倾斜 + 聚光
+  function initTilt() {
+    document.querySelectorAll("[data-tilt]").forEach((card) => {
+      card.addEventListener("mousemove", (e) => {
+        const rect = card.getBoundingClientRect()
+        const px = (e.clientX - rect.left) / rect.width
+        const py = (e.clientY - rect.top) / rect.height
+        card.style.setProperty("--mx", (px * 100).toFixed(1) + "%")
+        card.style.setProperty("--my", (py * 100).toFixed(1) + "%")
+        if (!fxState.tilt) return
+        const rx = (0.5 - py) * 10
+        const ry = (px - 0.5) * 12
+        card.style.transform =
+          "perspective(900px) rotateX(" + rx.toFixed(2) + "deg) rotateY(" + ry.toFixed(2) + "deg) translateY(-4px) scale(1.015)"
+      })
+      card.addEventListener("mouseleave", () => {
+        card.style.transform = ""
+      })
+    })
+  }
+
+  // 点击涟漪
+  function initRipple() {
+    document.addEventListener("click", (e) => {
+      if (!fxState.ripple) return
+      const target = e.target.closest(".btn, .icon-btn, .accent-swatch, .mode-btn")
+      if (!target) return
+      const rect = target.getBoundingClientRect()
+      const size = Math.max(rect.width, rect.height)
+      const dot = document.createElement("span")
+      dot.className = "ripple-dot"
+      dot.style.width = size + "px"
+      dot.style.height = size + "px"
+      dot.style.left = e.clientX - rect.left - size / 2 + "px"
+      dot.style.top = e.clientY - rect.top - size / 2 + "px"
+      target.appendChild(dot)
+      setTimeout(() => dot.remove(), 640)
+    })
+  }
+
+  // 数字滚动
+  function setStat(id, value) {
+    const node = el(id)
+    if (!node) return
+    const target = Number(value) || 0
+    if (!fxState.counter) {
+      node.textContent = target
+      return
+    }
+    const from = Number(String(node.textContent).replace(/[^0-9.-]/g, "")) || 0
+    if (from === target) {
+      node.textContent = target
+      return
+    }
+    const duration = 700
+    const startTime = performance.now()
+    function frame(now) {
+      const t = Math.min(1, (now - startTime) / duration)
+      const eased = 1 - Math.pow(1 - t, 3)
+      node.textContent = Math.round(from + (target - from) * eased)
+      if (t < 1) requestAnimationFrame(frame)
+    }
+    requestAnimationFrame(frame)
   }
 
   function showToast(message) {
@@ -108,10 +379,10 @@
 
   async function loadStats() {
     const s = await api("/stats/summary")
-    el("stat-active").textContent = s.activeLinks
-    el("stat-clicks").textContent = s.totalClicks
-    el("stat-qr").textContent = s.qrScans
-    el("stat-password").textContent = s.passwordProtected
+    setStat("stat-active", s.activeLinks)
+    setStat("stat-clicks", s.totalClicks)
+    setStat("stat-qr", s.qrScans)
+    setStat("stat-password", s.passwordProtected)
     el("usage-links").textContent = s.totalLinks
     el("usage-active").textContent = s.activeLinks
     el("usage-custom").textContent = s.customCodes
@@ -171,7 +442,7 @@
     el("batch-error").textContent = ""
     el("batch-results").innerHTML = ""
     if (!raw) {
-      el("batch-error").textContent = "请至少输入一个目标地址"
+      el("batch-error").textContent = "请至少��入一个目标地址"
       return
     }
     const items = raw
@@ -341,10 +612,19 @@
     el("btn-submit-create").addEventListener("click", submitCreate)
     el("btn-submit-edit").addEventListener("click", submitEdit)
 
-    el("theme-switch").addEventListener("click", toggleTheme)
+    document.querySelectorAll(".mode-btn").forEach((b) => {
+      b.addEventListener("click", () => setMode(b.dataset.mode))
+    })
     document.querySelectorAll(".accent-swatch").forEach((sw) => {
       sw.addEventListener("click", () => setAccent(sw.dataset.accent))
     })
+
+    Object.keys(FX_DEFAULTS).forEach((key) => {
+      const btn = el("fx-" + key + "-switch")
+      if (btn) btn.addEventListener("click", () => toggleFx(key))
+    })
+    const fxResetBtn = el("btn-fx-reset")
+    if (fxResetBtn) fxResetBtn.addEventListener("click", resetFx)
 
     el("btn-batch").addEventListener("click", () => {
       el("f-batch").value = ""
@@ -399,6 +679,7 @@
   async function init() {
     initTheme()
     bindEvents()
+    initFx()
     await loadConfig()
     await refreshAll()
   }

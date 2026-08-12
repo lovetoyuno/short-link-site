@@ -7,7 +7,10 @@
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-<div class="bg-decor"><div class="bg-blob b1"></div><div class="bg-blob b2"></div><div class="bg-blob b3"></div></div>
+<canvas id="fx-particles"></canvas>
+<div class="bg-decor" id="bg-decor"><div class="bg-blob b1"></div><div class="bg-blob b2"></div><div class="bg-blob b3"></div><div class="bg-blob b4"></div></div>
+<div class="bg-beam" id="bg-beam"></div>
+<div class="cursor-glow" id="cursor-glow"></div>
 <div class="app">
   <aside class="sidebar">
     <div class="brand"><span class="brand-mark">🔗</span><span class="brand-text">短链接</span></div>
@@ -17,18 +20,84 @@
     </nav>
 
     <div class="sidebar-section">
-      <div class="sidebar-label">外观</div>
-      <div class="theme-toggle-row">
-        <span class="theme-toggle-label">深色模式</span>
-        <button class="theme-switch" id="theme-switch" aria-label="切换深色模式"></button>
+      <div class="sidebar-label">主题模式</div>
+      <div class="mode-seg" id="mode-seg">
+        <button class="mode-btn" data-mode="light" title="浅色">☀️</button>
+        <button class="mode-btn" data-mode="dark" title="深色">🌙</button>
+        <button class="mode-btn" data-mode="midnight" title="午夜霎虹">✦</button>
+        <button class="mode-btn" data-mode="sepia" title="米色护眼">🍵</button>
+        <button class="mode-btn" data-mode="forest" title="深林">🌲</button>
       </div>
+      <div class="sidebar-label">主题色</div>
       <div class="accent-swatches" id="accent-swatches">
         <button class="accent-swatch" data-accent="blue" title="蓝色"></button>
         <button class="accent-swatch" data-accent="purple" title="紫色"></button>
         <button class="accent-swatch" data-accent="green" title="绿色"></button>
         <button class="accent-swatch" data-accent="orange" title="橙色"></button>
         <button class="accent-swatch" data-accent="pink" title="粉色"></button>
+        <button class="accent-swatch" data-accent="red" title="红色"></button>
+        <button class="accent-swatch" data-accent="teal" title="青蓝色"></button>
+        <button class="accent-swatch" data-accent="indigo" title="印度蓝"></button>
+        <button class="accent-swatch" data-accent="gold" title="金色"></button>
+        <button class="accent-swatch" data-accent="cyan" title="青色"></button>
+        <button class="accent-swatch" data-accent="azure" title="天蓝"></button>
+        <button class="accent-swatch" data-accent="mint" title="薄荷"></button>
+        <button class="accent-swatch" data-accent="lime" title="青柠"></button>
+        <button class="accent-swatch" data-accent="amber" title="琥珀"></button>
+        <button class="accent-swatch" data-accent="coral" title="珊瑚"></button>
+        <button class="accent-swatch" data-accent="crimson" title="绯红"></button>
+        <button class="accent-swatch" data-accent="magenta" title="品红"></button>
+        <button class="accent-swatch" data-accent="slate" title="石墨"></button>
       </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">特效设置</div>
+      <div class="fx-toggle-row">
+        <span class="fx-toggle-label">粒子连线背景</span>
+        <button class="fx-switch" id="fx-particles-switch" aria-label="切换粒子连线背景"></button>
+      </div>
+      <div class="fx-toggle-row">
+        <span class="fx-toggle-label">渐变光斑背景</span>
+        <button class="fx-switch" id="fx-blobs-switch" aria-label="切换渐变光斑背景"></button>
+      </div>
+      <div class="fx-toggle-row">
+        <span class="fx-toggle-label">发光/流光效果</span>
+        <button class="fx-switch" id="fx-glow-switch" aria-label="切换发光流光效果"></button>
+      </div>
+      <div class="fx-toggle-row">
+        <span class="fx-toggle-label">卡片入场动画</span>
+        <button class="fx-switch" id="fx-cards-switch" aria-label="切换卡片入场动画"></button>
+      </div>
+      <div class="fx-toggle-row">
+        <span class="fx-toggle-label">鼠标光晕跟随</span>
+        <button class="fx-switch" id="fx-cursor-switch" aria-label="切换鼠标光晕"></button>
+      </div>
+      <div class="fx-toggle-row">
+        <span class="fx-toggle-label">卡片 3D 倾斜</span>
+        <button class="fx-switch" id="fx-tilt-switch" aria-label="切换3D倾斜"></button>
+      </div>
+      <div class="fx-toggle-row">
+        <span class="fx-toggle-label">点击涟漪</span>
+        <button class="fx-switch" id="fx-ripple-switch" aria-label="切换点击涟漪"></button>
+      </div>
+      <div class="fx-toggle-row">
+        <span class="fx-toggle-label">数字滚动动画</span>
+        <button class="fx-switch" id="fx-counter-switch" aria-label="切换数字滚动"></button>
+      </div>
+      <div class="fx-toggle-row">
+        <span class="fx-toggle-label">星际扫光</span>
+        <button class="fx-switch" id="fx-beam-switch" aria-label="切换星际扫光"></button>
+      </div>
+      <div class="fx-toggle-row">
+        <span class="fx-toggle-label">网格底纹</span>
+        <button class="fx-switch" id="fx-grid-switch" aria-label="切换网格底纹"></button>
+      </div>
+      <div class="fx-toggle-row">
+        <span class="fx-toggle-label">彩色卡片配色</span>
+        <button class="fx-switch" id="fx-rainbow-switch" aria-label="切换彩色卡片配色"></button>
+      </div>
+      <button class="btn btn-secondary btn-small fx-reset" id="btn-fx-reset">恢复默认特效</button>
     </div>
   </aside>
 
@@ -39,25 +108,29 @@
     </header>
 
     <section class="stat-cards">
-      <div class="stat-card">
+      <div class="stat-card hue-1" data-tilt>
         <div class="stat-head"><span>有效链接</span><span class="stat-icon">🔗</span></div>
         <div class="stat-value" id="stat-active">0</div>
         <div class="stat-sub">你的账户中</div>
+        <div class="stat-glow"></div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card hue-2" data-tilt>
         <div class="stat-head"><span>总点击量</span><span class="stat-icon">📈</span></div>
         <div class="stat-value" id="stat-clicks">0</div>
         <div class="stat-sub">当前显示的链接</div>
+        <div class="stat-glow"></div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card hue-3" data-tilt>
         <div class="stat-head"><span>二维码扫描</span><span class="stat-icon">▦</span></div>
         <div class="stat-value" id="stat-qr">0</div>
         <div class="stat-sub">来自二维码</div>
+        <div class="stat-glow"></div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card hue-4" data-tilt>
         <div class="stat-head"><span>密码保护</span><span class="stat-icon">🔑</span></div>
         <div class="stat-value" id="stat-password">0</div>
         <div class="stat-sub">当前显示的加密链接</div>
+        <div class="stat-glow"></div>
       </div>
     </section>
 
