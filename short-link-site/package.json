@@ -1,6 +1,0 @@
-{
-  "name": "short-link-site",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Self-hosted short link management site on Cloudflare Pages + D1 (no CLI required to deploy)"
-}
